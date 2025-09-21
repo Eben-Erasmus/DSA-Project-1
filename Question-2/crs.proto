@@ -1,0 +1,183 @@
+syntax = "proto3";
+
+package crs;
+
+import "google/protobuf/timestamp.proto";
+
+//Car status
+enum CarStatus {
+  CAR_STATUS_UNSPECIFIED = 0;
+  AVAILABLE = 1;
+  UNAVAILABLE = 2;
+  MAINTENANCE = 3;
+  RENTED = 4;
+}
+
+//User role
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  CUSTOMER = 1;
+  ADMIN = 2;
+}
+
+//Simple operation result with optional message
+message OperationResult {
+  bool success = 1;
+  string message = 2;
+}
+
+//User messages
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  UserRole role = 4;
+}
+
+message CreateUsersResponse {
+  bool success = 1;
+  string message = 2;
+  repeated User created_users = 3;
+}
+
+//Car messages
+message Car {
+  string plate = 1;
+  string make = 2;
+  string model = 3;
+  int32 year = 4;
+  double daily_price = 5;
+  int64 mileage = 6;
+  CarStatus status = 7;
+  string color = 8;
+  string description = 9;
+}
+
+//Add car
+message AddCarRequest {
+  Car car = 1;                   
+}
+
+message AddCarResponse {
+  bool success = 1;
+  string plate = 2;
+  string message = 3;
+}
+
+//Upate car
+message UpdateCarRequest {
+  string plate = 1;
+  Car updated = 2;
+}
+message UpdateCarResponse {
+  bool success = 1;
+  string message = 2;
+  Car car = 3;
+}
+
+// Remove car
+message RemoveCarRequest {
+  string plate = 1;
+}
+message RemoveCarResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Car cars = 3;
+}
+
+//List available cars
+message ListAvailableCarsRequest {
+  string filter_text = 1;
+  int32 year = 2;
+}
+
+//Search carr by plate
+message SearchCarRequest {
+  string plate = 1;
+}
+message SearchCarResponse {
+  bool found = 1;
+  Car car = 2;
+  string message = 3;
+}
+
+//Cart and reservation messages
+message CartItem {
+  string plate = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+}
+
+//Add to cart
+message AddToCartRequest {
+  string user_id = 1;    
+  CartItem item = 2;
+}
+message AddToCartResponse {
+  bool success = 1;
+  string message = 2;
+  CartItem item = 3;             
+}
+
+//Reservation model
+message ReservationItem {
+  string plate = 1;
+  google.protobuf.Timestamp start_date = 2;
+  google.protobuf.Timestamp end_date = 3;
+  double daily_price = 4;
+  double total_price = 5;
+}
+
+message Reservation {
+  string reservation_id = 1;
+  string user_id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  repeated ReservationItem items = 4;
+  double total_price = 5;
+  string status = 6;
+}
+
+//Place reservation
+message PlaceReservationRequest {
+  string user_id = 1;
+}
+
+message PlaceReservationResponse {
+  bool success = 1;
+  string message = 2;
+  Reservation reservation = 3;
+}
+
+//list all reservations
+message ListReservationsRequest {
+  string user_id = 1;
+}
+
+service CarRental {
+  //register a car
+  rpc AddCar(AddCarRequest) returns (AddCarResponse);
+
+  //Create users
+  rpc CreateUsers(stream User) returns (CreateUsersResponse);
+
+  //Admin update
+  rpc UpdateCar(UpdateCarRequest) returns (UpdateCarResponse);
+
+  //remove
+  rpc RemoveCar(RemoveCarRequest) returns (RemoveCarResponse);
+
+  //list available cars
+  rpc ListAvailableCars(ListAvailableCarsRequest) returns (stream Car);
+
+  //Search for a specific car
+  rpc SearchCar(SearchCarRequest) returns (SearchCarResponse);
+
+  //dd to cart
+  rpc AddToCart(AddToCartRequest) returns (AddToCartResponse);
+
+  //place reservation
+  rpc PlaceReservation(PlaceReservationRequest) returns (PlaceReservationResponse);
+
+  //list reservations
+  rpc ListReservations(ListReservationsRequest) returns (stream Reservation);
+}
