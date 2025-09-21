@@ -1,4 +1,5 @@
 import ballerina/http;
+import ballerina/time;
 
 public type Asset readonly & record 
 {
@@ -56,6 +57,16 @@ table<Schedule> key(scheduleId) scheduleDB = table [];
 table<WorkOrder> key(workOrdersId) WorkOrdersDB = table [];
 table<Task> key(tasksId) TasksDB = table [];
 
+function isDateOverdue(string dueDateStr) returns boolean 
+{
+    time:Utc|error dueDate = time:utcFromString(dueDateStr + "T00:00:00Z");
+    if dueDate is error 
+    {
+        return false;
+    }
+    time:Utc currentTime = time:utcNow();
+    return dueDate < currentTime;
+}
 
 service / on new http:Listener(7070) 
 {
@@ -135,40 +146,40 @@ service / on new http:Listener(7070)
         return assetDB.toArray();
     }
 
-    //VIEW ASSETS BY FACULTY CODE HERE
-     resource function get assets/faculty/[string facultyName]() returns Asset[] {
+    //LIST ASSETS BY FACULTY
+     resource function get Asset/faculty/[string facultyName]() returns Asset[] 
+     {
         Asset[] facultyAssets = [];
-        foreach Asset asset in assetDatabase {
-            if asset.faculty.toLowerAscii() == facultyName.toLowerAscii() {
+        foreach Asset asset in assetDB 
+        {
+            if asset.faculty.toLowerAscii() == facultyName.toLowerAscii() 
+            {
                 facultyAssets.push(asset);
             }
         }
         return facultyAssets;
     }
-
-    // GET /assets/overdue - Get assets with overdue maintenance
-    resource function get assets/overdue() returns Asset[] {
+   
+    // LIST OVERDUE ASSETS
+    resource function get Asset/overdue() returns Asset[] 
+    {
         Asset[] overdueAssets = [];
-        foreach Asset asset in assetDatabase {
-            foreach MaintenanceSchedule schedule in asset.schedules {
-                if isDateOverdue(schedule.nextDueDate) {
-                    overdueAssets.push(asset);
-                    break; // Asset already added, no need to check other schedules
+        foreach Asset asset in assetDB 
+        {
+            foreach string schedId in asset.scheduleId 
+            {
+                Schedule? sched = scheduleDB[schedId];
+                if sched is Schedule {
+                    if isDateOverdue(sched.dueDate) 
+                    {
+                        overdueAssets.push(asset);
+                        break; // no need to check more schedules for this asset
+                    }
                 }
             }
         }
         return overdueAssets;
     }
-
-    //CHECK FOR OVERDUE ITEMS CODE HERE
-    function isDateOverdue(string dueDateStr) returns boolean {
-    time:Utc|error dueDate = time:utcFromString(dueDateStr + "T00:00:00Z");
-    if dueDate is error {
-        return false;
-    }
-    time:Utc currentTime = time:utcNow();
-    return dueDate < currentTime;
-}
 
     //ADD COMPONENT
     resource function post Component(@http:Payload Component newComponent) returns http:Response 
@@ -323,9 +334,9 @@ service / on new http:Listener(7070)
     }
 
    //ADD TASK
- resource function post Task(@http:Payload Task newTask) returns http:Response
+    resource function post Task(@http:Payload Task newTask) returns http:Response
     {
-        if TasksDB.hasKey(newTask.tasksIds) 
+        if TasksDB.hasKey(newTask.tasksId) 
         {
             http:Response resp = new();
             resp.statusCode = http:STATUS_CONFLICT;
@@ -344,7 +355,7 @@ service / on new http:Listener(7070)
     //UPDATE TASK
     resource function put Task/[string tasksId](@http:Payload Task updatedTask) returns http:Response 
     {
-        if !TasksDB.hasKey(updatedTask.tasksIds) 
+        if !TasksDB.hasKey(updatedTask.tasksId) 
         {
             http:Response resp = new();
             resp.statusCode = http:STATUS_NOT_FOUND;
@@ -362,7 +373,7 @@ service / on new http:Listener(7070)
     }
     
     //DELETE TASK
-resource function delete Task/[string tasksId]() returns http:Response 
+    resource function delete Task/[string tasksId]() returns http:Response 
     {
         if TasksDB.hasKey(tasksId) 
         {
