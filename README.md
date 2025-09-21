@@ -1,24 +1,31 @@
 # DSA-Project-1
 
-This project contains two main assignments implemented in Ballerina.
+Question 1 in "Question-1" folder.
 
-## Question 1: Asset Management System (REST API)
+🔹 Assets
+Add Asset
 
-A simple REST API for managing university assets, components, schedules, work orders, and tasks.
+POST /Asset
 
-### How to Run
+Create a new asset.
 
-```bash
-cd Question-1
-bal run service.bal
-```
+Payload Example:
 
-The server runs on `http://localhost:7070`
+{
+  "assetTag": "A001",
+  "name": "Printer",
+  "faculty": "Engineering",
+  "department": "IT",
+  "status": "Active",
+  "acquiredDate": "2025-01-01",
+  "componentIds": [],
+  "scheduleId": [],
+  "workOrdersId": []
+}
 
-### Assets
 
-**Add Asset**
-```bash
+cURL:
+
 curl -X POST http://localhost:7070/Asset \
   -H "Content-Type: application/json" \
   -d '{
@@ -32,54 +39,82 @@ curl -X POST http://localhost:7070/Asset \
     "scheduleId": [],
     "workOrdersId": []
   }'
-```
 
-**Update Asset**
-```bash
+Update Asset
+
+PUT /Asset/{assetTag}
+
+Payload Example:
+
+{
+  "assetTag": "A001",
+  "name": "Printer v2",
+  "faculty": "Engineering",
+  "department": "IT",
+  "status": "Inactive",
+  "acquiredDate": "2025-01-01",
+  "componentIds": ["C001"],
+  "scheduleId": [],
+  "workOrdersId": []
+}
+
+
+cURL:
+
 curl -X PUT http://localhost:7070/Asset/A001 \
   -H "Content-Type: application/json" \
   -d '{
     "assetTag": "A001",
-    "name": "Updated Printer",
+    "name": "Printer v2",
     "faculty": "Engineering",
     "department": "IT",
-    "status": "Active",
+    "status": "Inactive",
     "acquiredDate": "2025-01-01",
-    "componentIds": [],
+    "componentIds": ["C001"],
     "scheduleId": [],
     "workOrdersId": []
   }'
-```
 
-**Get Asset**
-```bash
+Get Asset by Tag
+
+GET /Asset/{assetTag}
+
+cURL:
+
 curl http://localhost:7070/Asset/A001
-```
 
-**Delete Asset**
-```bash
+Delete Asset
+
+DELETE /Asset/{assetTag}
+
+cURL:
+
 curl -X DELETE http://localhost:7070/Asset/A001
-```
 
-**List All Assets**
-```bash
+List All Assets
+
+GET /Asset
+
+cURL:
+
 curl http://localhost:7070/Asset
-```
 
-**List Assets by Faculty**
-```bash
-curl http://localhost:7070/Asset/faculty/Engineering
-```
+🔹 Components
+Add Component
 
-**List Overdue Assets**
-```bash
-curl http://localhost:7070/Asset/overdue
-```
+POST /Component
 
-### Components
+Payload Example:
 
-**Add Component**
-```bash
+{
+  "componentId": "C001",
+  "part": "Toner",
+  "description": "Black toner cartridge"
+}
+
+
+cURL:
+
 curl -X POST http://localhost:7070/Component \
   -H "Content-Type: application/json" \
   -d '{
@@ -87,22 +122,39 @@ curl -X POST http://localhost:7070/Component \
     "part": "Toner",
     "description": "Black toner cartridge"
   }'
-```
 
-**Delete Component**
-```bash
+Delete Component
+
+DELETE /Component/{componentId}
+
+cURL:
+
 curl -X DELETE http://localhost:7070/Component/C001
-```
 
-**List Components**
-```bash
+List Components
+
+GET /Component
+
+cURL:
+
 curl http://localhost:7070/Component
-```
 
-### Schedules
+🔹 Schedules
+Add Schedule
 
-**Add Schedule**
-```bash
+POST /Schedule
+
+Payload Example:
+
+{
+  "scheduleId": "S001",
+  "description": "Printer maintenance",
+  "dueDate": "2025-02-01"
+}
+
+
+cURL:
+
 curl -X POST http://localhost:7070/Schedule \
   -H "Content-Type: application/json" \
   -d '{
@@ -110,120 +162,88 @@ curl -X POST http://localhost:7070/Schedule \
     "description": "Printer maintenance",
     "dueDate": "2025-02-01"
   }'
-```
 
-**Delete Schedule**
-```bash
+Delete Schedule
+
+DELETE /Schedule/{scheduleId}
+
+cURL:
+
 curl -X DELETE http://localhost:7070/Schedule/S001
-```
 
-**List Schedules**
-```bash
+List Schedules
+
+GET /Schedule
+
+cURL:
+
 curl http://localhost:7070/Schedule
-```
 
-### Work Orders
+🔹 WorkOrders
+Add WorkOrder
 
-**Add Work Order**
-```bash
+POST /WorkOrder
+
+Payload Example:
+
+{
+  "workOrdersId": "W001",
+  "description": "Fix printer",
+  "status": "Open",
+  "assignedTo": "Technician1",
+  "priority": "High",
+  "createdDate": "2025-01-15",
+  "dueDate": "2025-01-20",
+  "taskIds": []
+}
+
+
+cURL:
+
 curl -X POST http://localhost:7070/WorkOrder \
   -H "Content-Type: application/json" \
   -d '{
     "workOrdersId": "W001",
     "description": "Fix printer",
     "status": "Open",
-    "assignedTo": "Tech1",
+    "assignedTo": "Technician1",
     "priority": "High",
     "createdDate": "2025-01-15",
     "dueDate": "2025-01-20",
     "taskIds": []
   }'
-```
 
-**Update Work Order**
-```bash
+Update WorkOrder
+
+PUT /WorkOrder/{workOrdersId}
+
+cURL:
+
 curl -X PUT http://localhost:7070/WorkOrder/W001 \
   -H "Content-Type: application/json" \
   -d '{
     "workOrdersId": "W001",
-    "description": "Fix printer urgent",
+    "description": "Fix printer (urgent)",
     "status": "In Progress",
-    "assignedTo": "Tech2",
+    "assignedTo": "Technician2",
     "priority": "High",
     "createdDate": "2025-01-15",
     "dueDate": "2025-01-19",
     "taskIds": ["T001"]
   }'
-```
 
-**Delete Work Order**
-```bash
+Delete WorkOrder
+
+DELETE /WorkOrder/{workOrdersId}
+
+cURL:
+
 curl -X DELETE http://localhost:7070/WorkOrder/W001
-```
 
-**List Work Orders**
-```bash
+List WorkOrders
+
+GET /WorkOrder
+
+cURL:
+
 curl http://localhost:7070/WorkOrder
-```
-
-### Tasks
-
-**Add Task**
-```bash
-curl -X POST http://localhost:7070/Task \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tasksId": "T001",
-    "description": "Replace toner",
-    "status": "Open",
-    "assignedTo": "Tech1",
-    "priority": "Medium",
-    "createdDate": "2025-01-15",
-    "dueDate": "2025-01-18"
-  }'
-```
-
-**Update Task**
-```bash
-curl -X PUT http://localhost:7070/Task/T001 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tasksId": "T001",
-    "description": "Replace toner cartridge",
-    "status": "Completed",
-    "assignedTo": "Tech1",
-    "priority": "Medium",
-    "createdDate": "2025-01-15",
-    "dueDate": "2025-01-18"
-  }'
-```
-
-**Delete Task**
-```bash
-curl -X DELETE http://localhost:7070/Task/T001
-```
-
-**List Tasks**
-```bash
-curl http://localhost:7070/Task
-```
-
-## Question 2: Car Rental System (gRPC)
-
-A gRPC-based car rental system with client-server architecture supporting admin and customer operations.
-
-### How to Run
-
-**Start the Server:**
-```bash
-cd Question-2/car_rental_service
-bal run
-```
-
-Server runs on `localhost:9090`
-
-**Run the Client (in another terminal):**
-```bash
-cd Question-2/car_rental_client
-bal run
-```
