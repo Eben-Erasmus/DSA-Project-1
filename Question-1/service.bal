@@ -322,5 +322,67 @@ service / on new http:Listener(7070)
        return WorkOrdersDB.toArray();
     }
 
-    //CODE FOR TASKS HERE
+   //ADD TASK
+ resource function post Task(@http:Payload Task newTask) returns http:Response
+    {
+        if TasksDB.hasKey(newTask.tasksIds) 
+        {
+            http:Response resp = new();
+            resp.statusCode = http:STATUS_CONFLICT;
+            resp.setPayload({ message: "Task already exists." });
+            return resp;
+        }
+
+        TasksDB.add(newTask);
+
+        http:Response resp = new();
+        resp.statusCode = http:STATUS_CREATED;
+        resp.setPayload({ message: "Success" });
+        return resp;
+    }
+
+    //UPDATE TASK
+    resource function put Task/[string tasksId](@http:Payload Task updatedTask) returns http:Response 
+    {
+        if !TasksDB.hasKey(updatedTask.tasksIds) 
+        {
+            http:Response resp = new();
+            resp.statusCode = http:STATUS_NOT_FOUND;
+            resp.setPayload({ message: "Task not found." });
+            return resp;
+        }
+
+        _ = TasksDB.remove(tasksId);
+        TasksDB.add(updatedTask);
+
+        http:Response resp = new();
+        resp.statusCode = http:STATUS_OK;
+        resp.setPayload({ message: "Task updated successfully." });
+        return resp;
+    }
+    
+    //DELETE TASK
+resource function delete Task/[string tasksId]() returns http:Response 
+    {
+        if TasksDB.hasKey(tasksId) 
+        {
+            _ = TasksDB.remove(tasksId);
+
+            http:Response resp = new();
+            resp.statusCode = http:STATUS_OK;
+            resp.setPayload({ message: "Task removed successfully." });
+            return resp;
+        } 
+        
+        http:Response resp = new();
+        resp.statusCode = http:STATUS_NOT_FOUND;
+        resp.setPayload({ message: "Task not found." });
+        return resp;
+    }
+
+    //LIST TASK
+        resource function get Task() returns Task[] 
+    {
+       return TasksDB.toArray();
+    }
 }
