@@ -136,8 +136,39 @@ service / on new http:Listener(7070)
     }
 
     //VIEW ASSETS BY FACULTY CODE HERE
+     resource function get assets/faculty/[string facultyName]() returns Asset[] {
+        Asset[] facultyAssets = [];
+        foreach Asset asset in assetDatabase {
+            if asset.faculty.toLowerAscii() == facultyName.toLowerAscii() {
+                facultyAssets.push(asset);
+            }
+        }
+        return facultyAssets;
+    }
+
+    // GET /assets/overdue - Get assets with overdue maintenance
+    resource function get assets/overdue() returns Asset[] {
+        Asset[] overdueAssets = [];
+        foreach Asset asset in assetDatabase {
+            foreach MaintenanceSchedule schedule in asset.schedules {
+                if isDateOverdue(schedule.nextDueDate) {
+                    overdueAssets.push(asset);
+                    break; // Asset already added, no need to check other schedules
+                }
+            }
+        }
+        return overdueAssets;
+    }
 
     //CHECK FOR OVERDUE ITEMS CODE HERE
+    function isDateOverdue(string dueDateStr) returns boolean {
+    time:Utc|error dueDate = time:utcFromString(dueDateStr + "T00:00:00Z");
+    if dueDate is error {
+        return false;
+    }
+    time:Utc currentTime = time:utcNow();
+    return dueDate < currentTime;
+}
 
     //ADD COMPONENT
     resource function post Component(@http:Payload Component newComponent) returns http:Response 

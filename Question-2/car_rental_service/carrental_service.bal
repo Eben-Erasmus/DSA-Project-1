@@ -9,9 +9,25 @@ service "CarRental" on ep {
     }
 
     remote function UpdateCar(UpdateCarRequest value) returns UpdateCarResponse|error {
+
+
     }
 
-    remote function RemoveCar(RemoveCarRequest value) returns RemoveCarResponse|error {
+   remote function RemoveCar(RemoveCarRequest value) returns RemoveCarResponse|error {
+
+        isolated remote function RemoveCar(RemoveCarRequest|ContextRemoveCarRequest req) returns RemoveCarResponse|grpc:Error {
+        map<string|string[]> headers = {};
+        RemoveCarRequest message;
+        if req is ContextRemoveCarRequest {
+            message = req.content;
+            headers = req.headers;
+        } else {
+            message = req;
+        }
+        var payload = check self.grpcClient->executeSimpleRPC("crs.CarRental/RemoveCar", message, headers);
+        [anydata, map<string|string[]>] [result, _] = payload;
+        return <RemoveCarResponse>result;
+}
     }
 
     remote function SearchCar(SearchCarRequest value) returns SearchCarResponse|error {
