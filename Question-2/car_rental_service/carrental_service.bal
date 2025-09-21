@@ -1,253 +1,161 @@
 import ballerina/grpc;
-import ballerina/time;
 
 final map<Cart> carts = {};
 final map<Reservation[]> reservations = {};
-final map<Car> inventory = {};
-final map<User> users = {};
 
-type Cart record 
-{
+type Cart record {
     string userId;
     CartItem[] items;
+};
+
+type Car record {
+    string plate;
+    string make;
+    string model;
+    decimal dailyRate;
 };
 
 listener grpc:Listener ep = new (9090);
 
 @grpc:Descriptor {value: CRS_DESC}
-service "CarRental" on ep 
-{
-    remote function AddCar(AddCarRequest value) returns AddCarResponse|error 
-    {
-        if inventory.hasKey(value.car.plate) 
-        {
-            return {success: false, plate: value.car.plate, message: "Car already exists"};
-        }
-        
-        Car carToAdd = value.car;
-        if carToAdd.status == CAR_STATUS_UNSPECIFIED 
-        {
-            carToAdd.status = AVAILABLE;
-        }
-        
-        inventory[value.car.plate] = carToAdd;
-        return {success: true, plate: value.car.plate, message: "Car added successfully"};
+service "CarRental" on ep {
+
+    remote function AddCar(AddCarRequest value) returns AddCarResponse|error {
     }
 
-    remote function UpdateCar(UpdateCarRequest value) returns UpdateCarResponse|error 
-    {
-        if !inventory.hasKey(value.plate) 
-        {
-            return {success: false, message: "Car not found", car: value.updated};
-        }
-        inventory[value.plate] = value.updated;
-        return {success: true, message: "Car updated", car: value.updated};
+    remote function UpdateCar(UpdateCarRequest value) returns UpdateCarResponse|error {
+
+
     }
 
-    remote function RemoveCar(RemoveCarRequest req) returns RemoveCarResponse|error 
-    {
-        if !inventory.hasKey(req.plate) 
-        {
-            return {success: false, message: "Car not found", cars: []};
+   remote function RemoveCar(RemoveCarRequest value) returns RemoveCarResponse|error {
+
+        isolated remote function RemoveCar(RemoveCarRequest|ContextRemoveCarRequest req) returns RemoveCarResponse|grpc:Error {
+        map<string|string[]> headers = {};
+        RemoveCarRequest message;
+        if req is ContextRemoveCarRequest {
+            message = req.content;
+            headers = req.headers;
+        } else {
+            message = req;
         }
-        _ = inventory.remove(req.plate);
-        Car[] carsList = [];
-        foreach Car car in inventory 
-        {
-            carsList.push(car);
-        }
-        return {success: true, message: "Car removed", cars: carsList};
+        var payload = check self.grpcClient->executeSimpleRPC("crs.CarRental/RemoveCar", message, headers);
+        [anydata, map<string|string[]>] [result, _] = payload;
+        return <RemoveCarResponse>result;
+}
     }
 
-    remote function SearchCar(SearchCarRequest value) returns SearchCarResponse|error 
-    {
-        if inventory.hasKey(value.plate) 
-        {
-            Car car = inventory.get(value.plate);
-            return {found: true, car: car, message: "Car found"};
-        }
-        return {found: false, car: {}, message: "Car not found"};
+    remote function SearchCar(SearchCarRequest value) returns SearchCarResponse|error {
     }
 
-    remote function AddToCart(AddToCartRequest req) returns AddToCartResponse|error 
-    {
-        if req.item.start_date[0] >= req.item.end_date[0] 
-        {
-            return {success: false, message: "Invalid rental period", item: {}};
+    remote function AddToCart(AddToCartRequest req) returns AddToCartResponse|error {
+        // Validate dates
+        time:Civil start = check time:parseCivil(req.startDate, "yyyy-MM-dd");
+        time:Civil end = check time:parseCivil(req.endDate, "yyyy-MM-dd");
+        if time:utcFromCivil(start).unixTime >= time:utcFromCivil(end).unixTime {
+            return {message: "Invalid rental period: start date must be before end date", item: ()};
         }
 
-        if !inventory.hasKey(req.item.plate) 
-        {
-            return {success: false, message: "Car not found", item: {}};
+        // Check inventory
+        if !inventory.hasKey(req.plate) {
+            return {message: string `Car with plate ${req.plate} not found in inventory.`, item: ()};
         }
 
-        CartItem item = 
-        {
-            plate: req.item.plate,
-            start_date: req.item.start_date,
-            end_date: req.item.end_date
+        CartItem item = {
+            plate: req.plate,
+            startDate: req.startDate,
+            endDate: req.endDate
         };
 
-        if carts.hasKey(req.user_id) 
-        {
-            Cart currentCart = carts.get(req.user_id);
+        if carts.hasKey(req.userId) {
+            Cart currentCart = carts[req.userId];
             currentCart.items.push(item);
+        } else {
+            carts[req.userId] = {userId: req.userId, items: [item]};
         }
-        else 
-        {
-            carts[req.user_id] = {userId: req.user_id, items: [item]};
-        }
-
-        return {success: true, message: "Item added to cart", item: item};
+        return {message: "Item added to cart", item: item};
     }
 
-    remote function PlaceReservation(PlaceReservationRequest req) returns PlaceReservationResponse|error 
-    {
-        if !carts.hasKey(req.user_id) 
-        {
-            return {success: false, message: "Cart is empty", reservation: {}};
+    remote function PlaceReservation(PlaceReservationRequest req) returns PlaceReservationResponse|error {
+        if !carts.hasKey(req.userId) {
+            return {message: "Cart is empty."};
         }
 
-        Cart cart = carts.get(req.user_id);
-        ReservationItem[] reservationItems = [];
+        Cart cart = carts[req.userId];
+        Reservation[] confirmed = [];
 
-        foreach CartItem item in cart.items 
-        {
-            if item.start_date[0] >= item.end_date[0] 
-            {
+        foreach CartItem item in cart.items {
+            time:Civil start = check time:parseCivil(item.startDate, "yyyy-MM-dd");
+            time:Civil end = check time:parseCivil(item.endDate, "yyyy-MM-dd");
+
+            if time:utcFromCivil(start).unixTime >= time:utcFromCivil(end).unixTime {
                 continue;
             }
 
-            boolean isConflict = false;
-            if reservations.hasKey(req.user_id) 
-            {
-                Reservation[] userReservations = reservations.get(req.user_id);
-                foreach Reservation existingReservation in userReservations 
-                {
-                    foreach ReservationItem existingItem in existingReservation.items 
-                    {
-                        if item.plate == existingItem.plate && 
-                           ((item.start_date[0] >= existingItem.start_date[0] && item.start_date[0] <= existingItem.end_date[0]) ||
-                            (item.end_date[0] >= existingItem.start_date[0] && item.end_date[0] <= existingItem.end_date[0]) ||
-                            (item.start_date[0] <= existingItem.start_date[0] && item.end_date[0] >= existingItem.end_date[0])) 
-                        {
-                            isConflict = true;
+            boolean conflict = false;
+            if reservations.hasKey(req.userId) {
+                foreach Reservation existingReservation in reservations[req.userId] {
+                    foreach ReservationItem existingItem in existingReservation.items {
+                        int existingStartUnixTime = existingItem.start_date[0];
+                        int existingEndUnixTime = existingItem.end_date[0];
+                        if item.plate == existingItem.plate && (
+                            (time:utcFromCivil(start).unixTime >= existingStartUnixTime && time:utcFromCivil(start).unixTime <= existingEndUnixTime) ||
+                            (time:utcFromCivil(end).unixTime >= existingStartUnixTime && time:utcFromCivil(end).unixTime <= existingEndUnixTime) ||
+                            (time:utcFromCivil(start).unixTime <= existingStartUnixTime && time:utcFromCivil(end).unixTime >= existingEndUnixTime)
+                        ) {
+                            conflict = true;
                         }
                     }
                 }
             }
 
-            if isConflict || !inventory.hasKey(item.plate) 
-            {
+            if conflict || !inventory.hasKey(item.plate) {
                 continue;
             }
 
-            Car car = inventory.get(item.plate);
-            int days = <int>((item.end_date[0] - item.start_date[0]) / (24 * 60 * 60));
-            float price = car.daily_price * days;
+            Car car = inventory[item.plate];
+            int days = <int>((time:utcFromCivil(end).unixTime - time:utcFromCivil(start).unixTime) / (24 * 60 * 60));
+            float price = <float>car.dailyRate * days;
 
-            ReservationItem resItem = 
-            {
+            // This creates the ReservationItem first.
+            ReservationItem resItem = {
                 plate: item.plate,
-                start_date: item.start_date,
-                end_date: item.end_date,
-                daily_price: car.daily_price,
+                start_date: check time:utcFromCivil(start),
+                end_date: check time:utcFromCivil(end),
+                daily_price: <float>car.dailyRate,
                 total_price: price
             };
-            reservationItems.push(resItem);
-        }
 
-        if reservationItems.length() > 0 
-        {
-            float totalPrice = 0.0;
-            foreach ReservationItem item in reservationItems 
-            {
-                totalPrice = totalPrice + item.total_price;
-            }
-
-            Reservation res = 
-            {
-                reservation_id: string `RES-${req.user_id}-${time:utcNow()[0]}`,
-                user_id: req.user_id,
+            // Then, this creates a complete Reservation record that wraps the item.
+            Reservation res = {
+                reservation_id: string `RES-${req.userId}-${time:utcNow().unixTime}`,
+                user_id: req.userId,
                 created_at: time:utcNow(),
-                items: reservationItems,
-                total_price: totalPrice,
+                items: [resItem],
+                total_price: price,
                 status: "CONFIRMED"
             };
-
-            if reservations.hasKey(req.user_id) 
-            {
-                Reservation[] existingReservations = reservations.get(req.user_id);
-                reservations[req.user_id] = [...existingReservations, res];
-            }
-            else 
-            {
-                reservations[req.user_id] = [res];
-            }
-
-            _ = carts.remove(req.user_id);
-            return {success: true, message: "Reservation placed", reservation: res};
+            confirmed.push(res);
         }
 
-        return {success: false, message: "No valid reservations", reservation: {}};
-    }
-
-    remote function CreateUsers(stream<User, grpc:Error?> clientStream) returns CreateUsersResponse|error 
-    {
-        User[] createdUsers = [];
-
-        while true 
-        {
-            var user = clientStream.next();
-
-            if user is record {| User value; |} 
-            {
-                users[user.value.id] = user.value;
-                createdUsers.push(user.value);
-            }
-            else if user is grpc:Error 
-            {
-                return error("Error receiving user: " + user.message());
-            }
-            else 
-            {
-                break;
-            }
+        if confirmed.length() > 0 {
+            reservations[req.userId] = reservations.hasKey(req.userId) ? [...reservations[req.userId], ...confirmed] : confirmed;
         }
 
-        return 
-        {
-            success: createdUsers.length() > 0,
-            message: "Users created successfully",
-            created_users: createdUsers
+        carts.remove(req.userId);
+
+        return {
+            message: confirmed.length() > 0 ? "Reservation(s) placed." : "No valid reservations.",
+            confirmed: confirmed
         };
     }
 
-    remote function ListAvailableCars(ListAvailableCarsRequest req) returns stream<Car, error?>|error 
-    {
-        Car[] filteredCars = [];
-
-        foreach Car car in inventory 
-        {
-            if car.status == AVAILABLE &&
-               (req.filter_text == "" || car.make.includes(req.filter_text)) &&
-               (req.year == 0 || car.year == req.year) 
-            {
-                filteredCars.push(car);
-            }
-        }
-
-        return filteredCars.toStream();
+    remote function CreateUsers(stream<User, grpc:Error?> clientStream) returns CreateUsersResponse|error {
     }
 
-    remote function ListReservations(ListReservationsRequest req) returns stream<Reservation, error?>|error 
-    {
-        if reservations.hasKey(req.user_id) 
-        {
-            Reservation[] userReservations = reservations.get(req.user_id);
-            return userReservations.toStream();
-        }
-        Reservation[] emptyArray = [];
-        return emptyArray.toStream();
+    remote function ListAvailableCars(ListAvailableCarsRequest value) returns stream<Car, error?>|error {
+    }
+
+    remote function ListReservations(ListReservationsRequest value) returns stream<Reservation, error?>|error {
     }
 }
